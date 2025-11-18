@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Creepy Flickering Image + Audio Video Recorder</title>
+
+  <!-- Nosifer font -->
+  <link href="https://fonts.googleapis.com/css2?family=Nosifer&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+
+    canvas {
+      border: 1px solid #444;
+      background: #000;
+      display: block;
+      margin: 20px auto;
+      max-width: 100%;
+      height: auto;
+    }
+
+    button {
+      margin: 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background: #222;
+      color: #eee;
+      border: 1px solid #555;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    a {
+      color: #66ff66;
+      font-weight: bold;
+      text-decoration: none;
+      font-size: 18px;
+    }
+
+    input[type="text"], input[type="range"] {
+      padding: 8px;
+      font-size: 16px;
+      width: 300px;
+      background: #222;
+      color: #eee;
+      border: 1px solid #555;
+    }
+
+    #opacityLabel {
+      margin-top: 10px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Upload Image and Audio, Record Creepy Flickering Video</h2>
+  <input type="file" id="imageInput" accept="image/*" /><span>image</span><br/><br/>
+  <input type="file" id="audioInput" accept="audio/*" /><span>audio</span><br/><br/>
+  <input type="text" id="overlayText" placeholder="Enter creepy text..." /><br/><br/>
+
+  <label id="opacityLabel">Overlay Darkness: <span id="opacityValue">0.5</span></label><br/>
+  <input type="range" id="overlayOpacity" min="0" max="1" step="0.01" value="0.5" /><br/><br/>
+
+  <button id="startBtn" disabled>Start Recording</button>
+  <button id="stopBtn" disabled>Stop Recording</button>
+
+  <canvas id="canvas" width="1280" height="720"></canvas>
+
+  <video id="playback" controls style="display:none; margin-top: 15px;" width="640"></video><br/>
+  <a id="downloadLink" style="display:none;">Download Video</a>
+
+  <script>
+    const imageInput = document.getElementById('imageInput');
+    const audioInput = document.getElementById('audioInput');
+    const overlayText = document.getElementById('overlayText');
+    const overlayOpacityInput = document.getElementById('overlayOpacity');
+    const opacityValueLabel = document.getElementById('opacityValue');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const playback = document.getElementById('playback');
+    const downloadLink = document.getElementById('downloadLink');
+
+    let image = new Image();
+    let audio = new Audio();
+    let mediaRecorder;
+    let recordedChunks = [];
+    let imageReady = false;
+    let audioReady = false;
+
+    const nosiferFont = new FontFace('Nosifer', 'url(https://fonts.gstatic.com/s/nosifer/v21/ZGjXol5JTp0g5bxZWCRyEM-B.woff2)');
+    nosiferFont.load().then(font => document.fonts.add(font));
+
+    function drawImageCover(ctx, img, canvasWidth, canvasHeight) {
+      const imgAspect = img.width / img.height;
+      const canvasAspect = canvasWidth / canvasHeight;
+
+      let drawWidth, drawHeight;
+
+      if (imgAspect > canvasAspect) {
+        drawHeight = canvasHeight;
+        drawWidth = canvasHeight * imgAspect;
+      } else {
+        drawWidth = canvasWidth;
+        drawHeight = canvasWidth / imgAspect;
+      }
+
+      const x = (canvasWidth - drawWidth) / 2;
+      const y = (canvasHeight - drawHeight) / 2;
+
+      ctx.drawImage(img, x, y, drawWidth, drawHeight);
+    }
+
+    imageInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      image.onload = () => {
+        imageReady = true;
+        checkReady();
+        drawStatic();
+      };
+      image.src = url;
+    });
+
+    audioInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      audio.src = URL.createObjectURL(file);
+      audio.onloadedmetadata = () => {
+        audioReady = true;
+        checkReady();
+      };
+    });
+
+    overlayOpacityInput.addEventListener('input', () => {
+      opacityValueLabel.textContent = overlayOpacityInput.value;
+    });
+
+    function checkReady() {
+      startBtn.disabled = !(imageReady && audioReady);
+    }
+
+    function flickerIntensity() {
+      return 0.7 + Math.random() * 0.2;
+    }
+
+    function drawStatic() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      drawImageCover(ctx, image, canvas.width, canvas.height);
+
+      const flicker = flickerIntensity();
+      const overlayOpacity = parseFloat(overlayOpacityInput.value);
+
+      ctx.fillStyle = `rgba(255,255,255,${0.02 * flicker})`;
+      for (let i = 0; i < 50; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const w = 1 + Math.random() * 2;
+        const h = 10 + Math.random() * 20;
+        ctx.fillRect(x, y, w, h);
+      }
+
+      // Final overlay = user value * flicker effect
+      const effectiveOverlay = overlayOpacity * (1 - flicker);
+      ctx.fillStyle = `rgba(0, 0, 0, ${effectiveOverlay})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const text = overlayText.value.trim();
+      if (text !== '') {
+        const glow = 5 + Math.sin(Date.now() / 150) * 5;
+        ctx.font = '72px Nosifer';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        for (let i = 0; i < 3; i++) {
+          ctx.shadowColor = `rgba(255, 0, 0, ${0.4 + i * 0.2})`;
+          ctx.shadowBlur = glow * (i + 1);
+          ctx.fillStyle = 'red';
+          ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'white';
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+      }
+    }
+
+    let animationId;
+
+    function animate() {
+      drawStatic();
+      animationId = requestAnimationFrame(animate);
+    }
+
+    startBtn.onclick = () => {
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      playback.style.display = 'none';
+      downloadLink.style.display = 'none';
+
+      animate();
+
+      const canvasStream = canvas.captureStream(30);
+      const audioCtx = new AudioContext();
+      const source = audioCtx.createMediaElementSource(audio);
+      const destination = audioCtx.createMediaStreamDestination();
+      source.connect(destination);
+      source.connect(audioCtx.destination);
+
+      const combinedStream = new MediaStream([
+        ...canvasStream.getVideoTracks(),
+        ...destination.stream.getAudioTracks(),
+      ]);
+
+      recordedChunks = [];
+      mediaRecorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm; codecs=vp8,opus' });
+
+      mediaRecorder.ondataavailable = event => {
+        if (event.data.size > 0) {
+          recordedChunks.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        cancelAnimationFrame(animationId);
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        playback.src = url;
+        playback.style.display = 'block';
+
+        downloadLink.href = url;
+        downloadLink.download = 'creepy_video.webm';
+        downloadLink.style.display = 'inline';
+        downloadLink.textContent = 'Download Video';
+      };
+
+      mediaRecorder.start();
+      audio.play();
+    };
+
+    stopBtn.onclick = () => {
+      stopBtn.disabled = true;
+      mediaRecorder.stop();
+      audio.pause();
+      startBtn.disabled = false;
+    };
+  </script>
+</body>
+</html>
