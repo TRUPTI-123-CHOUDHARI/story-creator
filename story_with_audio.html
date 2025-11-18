@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Audio Combiner</title>
+  <style>
+ /* Style for link as button */
+    .button-link {
+      display: inline-block;
+      background-color: blue;
+      color: white;
+      text-decoration: none;
+      padding: 10px 20px;
+      font-size: 1.1em;
+      border-radius: 5px;
+      margin-top: 20px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .button-link:hover {
+      background-color: #bb2222;
+    }
+    </style>
+</head>
+<body>
+  <h2>🎧 3D Audio Combiner</h2>
+
+  <input type="file" id="audio1" accept="audio/*">
+  <label for="audio1">Upload File Audio 1(speaker)</label>
+  <br><br>
+
+  <input type="file" id="audio2" accept="audio/*">
+  <label for="audio2">Upload File Audio 2(music)</label>
+  <br><br>
+
+  <label for="volume2">Volume for Audio 2:</label>
+  <input type="range" id="volume2" min="0" max="1" step="0.01" value="1">
+  <span id="volumeValue">1.00</span>
+  <br><br>
+
+  <button onclick="playCombined()">▶ Play Combined Audio</button>
+  <button onclick="downloadCombined()" style="margin-left:10px;">💾 Download Combined Audio</button>
+<a href="Audio_image.html" class="button-link">Add image + story name + this combine audio</a>
+  <script>
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    let audioBuffer1 = null;
+    let audioBuffer2 = null;
+
+    document.getElementById('audio1').addEventListener('change', function(e) {
+      loadAudioFile(e.target.files[0], 1);
+    });
+
+    document.getElementById('audio2').addEventListener('change', function(e) {
+      loadAudioFile(e.target.files[0], 2);
+    });
+
+    document.getElementById('volume2').addEventListener('input', function(e) {
+      document.getElementById('volumeValue').textContent = parseFloat(e.target.value).toFixed(2);
+    });
+
+    function loadAudioFile(file, number) {
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        audioContext.decodeAudioData(evt.target.result, function(buffer) {
+          if (number === 1) audioBuffer1 = buffer;
+          else audioBuffer2 = buffer;
+          console.log(`Loaded Audio ${number}`);
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function playCombined() {
+      if (!audioBuffer1 || !audioBuffer2) {
+        alert("Please upload both audio files first.");
+        return;
+      }
+
+      const duration = audioBuffer1.duration;
+
+      let source1 = audioContext.createBufferSource();
+      source1.buffer = audioBuffer1;
+      let panner1 = audioContext.createStereoPanner();
+      panner1.pan.value = -1; // Left
+      source1.connect(panner1).connect(audioContext.destination);
+
+      let source2 = audioContext.createBufferSource();
+      source2.buffer = audioBuffer2;
+      let gainNode2 = audioContext.createGain();
+      gainNode2.gain.value = parseFloat(document.getElementById('volume2').value);
+      let panner2 = audioContext.createStereoPanner();
+      panner2.pan.value = 1; // Right
+      source2.connect(gainNode2).connect(panner2).connect(audioContext.destination);
+
+      source1.start(0, 0, duration);
+      source2.start(0, 0, duration);
+
+      // Alert when playback is finished
+      setTimeout(() => {
+        alert("✅ Combined audio playback completed!");
+      }, duration * 1000);
+    }
+
+    // Converts an AudioBuffer to a WAV Blob
+    function bufferToWav(buffer) {
+      const numOfChan = buffer.numberOfChannels;
+      const sampleRate = buffer.sampleRate;
+      const length = buffer.length * numOfChan * 2 + 44;
+      const bufferArray = new ArrayBuffer(length);
+      const view = new DataView(bufferArray);
+      const channels = [];
+      let offset = 0;
+
+      function writeString(str) {
+        for (let i = 0; i < str.length; i++) {
+          view.setUint8(offset++, str.charCodeAt(i));
+        }
+      }
+
+      // Write WAV header
+      writeString('RIFF');
+      view.setUint32(offset, length - 8, true); offset += 4;
+      writeString('WAVE');
+      writeString('fmt ');
+      view.setUint32(offset, 16, true); offset += 4;
+      view.setUint16(offset, 1, true); offset += 2;
+      view.setUint16(offset, numOfChan, true); offset += 2;
+      view.setUint32(offset, sampleRate, true); offset += 4;
+      view.setUint32(offset, sampleRate * numOfChan * 2, true); offset += 4;
+      view.setUint16(offset, numOfChan * 2, true); offset += 2;
+      view.setUint16(offset, 16, true); offset += 2;
+      writeString('data');
+      view.setUint32(offset, length - offset - 4, true); offset += 4;
+
+      for (let i = 0; i < numOfChan; i++) {
+        channels.push(buffer.getChannelData(i));
+      }
+
+      const sampleLength = buffer.length;
+      for (let i = 0; i < sampleLength; i++) {
+        for (let ch = 0; ch < numOfChan; ch++) {
+          let sample = Math.max(-1, Math.min(1, channels[ch][i]));
+          sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+          view.setInt16(offset, sample, true);
+          offset += 2;
+        }
+      }
+
+      return new Blob([bufferArray], { type: 'audio/wav' });
+    }
+
+    async function downloadCombined() {
+      if (!audioBuffer1 || !audioBuffer2) {
+        alert("Please upload both audio files first.");
+        return;
+      }
+
+      const duration = audioBuffer1.duration;
+      const sampleRate = audioContext.sampleRate;
+      const offlineContext = new OfflineAudioContext(2, sampleRate * duration, sampleRate);
+
+      const source1 = offlineContext.createBufferSource();
+      source1.buffer = audioBuffer1;
+      const panner1 = offlineContext.createStereoPanner();
+      panner1.pan.value = -1;
+      source1.connect(panner1).connect(offlineContext.destination);
+
+      const source2 = offlineContext.createBufferSource();
+      source2.buffer = audioBuffer2;
+      const gain2 = offlineContext.createGain();
+      gain2.gain.value = parseFloat(document.getElementById('volume2').value);
+      const panner2 = offlineContext.createStereoPanner();
+      panner2.pan.value = 1;
+      source2.connect(gain2).connect(panner2).connect(offlineContext.destination);
+
+      source1.start(0, 0, duration);
+      source2.start(0, 0, duration);
+
+      const renderedBuffer = await offlineContext.startRendering();
+      const wavBlob = bufferToWav(renderedBuffer);
+      const url = URL.createObjectURL(wavBlob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'combined_audio.wav';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
