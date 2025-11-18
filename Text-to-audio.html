@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hindi Story with Dark Flicker Image & Creepy Audio</title>
+  <style>
+    body {
+      background-color: #111;
+      color: #eee;
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 20px auto;
+      padding: 10px;
+      text-align: center;
+    }
+
+    textarea {
+      width: 100%;
+      height: 150px;
+      background: #222;
+      color: #eee;
+      border: none;
+      padding: 10px;
+      font-size: 1.1em;
+      resize: vertical;
+    }
+
+    #imageContainer {
+      margin-top: 30px;
+      position: relative;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+      filter: brightness(0.3) contrast(1.2) grayscale(0.7);
+      border-radius: 10px;
+      box-shadow: 0 0 30px 10px rgba(255, 0, 0, 0.3);
+      display: none;
+    }
+
+    #flickerImage {
+      width: 100%;
+      display: block;
+      border-radius: 10px;
+      animation: flicker 3s infinite;
+    }
+
+    @keyframes flicker {
+      0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+        opacity: 1;
+        filter: drop-shadow(0 0 5px #ff0000);
+      }
+      20%, 22%, 24%, 55% {
+        opacity: 0.5;
+        filter: none;
+      }
+    }
+
+    audio {
+      margin-top: 20px;
+      width: 100%;
+      outline: none;
+    }
+
+    button {
+      background-color: #880000;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 1.1em;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #bb2222;
+    }
+
+    /* Style for link as button */
+    .button-link {
+      display: inline-block;
+      background-color: blue;
+      color: white;
+      text-decoration: none;
+      padding: 10px 20px;
+      font-size: 1.1em;
+      border-radius: 5px;
+      margin-top: 20px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .button-link:hover {
+      background-color: #bb2222;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Hindi Story with Dark Flicker Image & Creepy Audio</h1>
+
+  <textarea id="storyInput" placeholder="यहाँ हिंदी कहानी लिखें...">अंधेरे में आवाज़  
+रात के सन्नाटे में, रिया अपने कमरे में अकेली थी। अचानक उसे किसी की फुसफुसाहट सुनाई दी।  
+उसने दरवाज़ा खोला लेकिन वहाँ कोई नहीं था।  
+वह घबराई हुई वापस आई, तभी उसके पीछे से एक ठंडी हवा चली और धीरे-धीरे एक आवाज़ गूँजने लगी, "मैं यहाँ हूँ..."  
+रिया ने पीछे मुड़कर देखा, लेकिन कमरे में सिर्फ अंधेरा था।  
+उस रात से, वह कभी अकेली नहीं रहती।</textarea><br />
+
+  <button onclick="generate()">Generate Image & Play Audio</button>
+
+  <div id="imageContainer">
+    <img id="flickerImage" src="" alt="Story Scene" />
+  </div>
+
+  <audio id="audioPlayer" controls></audio>
+
+  <a href="story_with_audio.html" class="button-link">Combine Music + Story Telling</a>
+
+  <script>
+    const creepyBgUrl = 'https://cdn.pixabay.com/download/audio/2022/03/27/audio_8a3eeb3b6b.mp3?filename=dark-ambient-6459.mp3';
+    const creepyImageUrl = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=700&q=80';
+
+    async function generate() {
+      const storyText = document.getElementById('storyInput').value.trim();
+      if (!storyText) {
+        alert('कृपया हिंदी कहानी दर्ज करें।');
+        return;
+      }
+
+      // Show dark flickering image
+      const img = document.getElementById('flickerImage');
+      img.src = creepyImageUrl;
+      document.getElementById('imageContainer').style.display = 'block';
+
+      // Play creepy background sound loop
+      let bgAudio = new Audio(creepyBgUrl);
+      bgAudio.loop = true;
+      bgAudio.volume = 0.2;
+
+      try {
+        await bgAudio.play();
+      } catch (e) {
+        console.log('User interaction required to start audio.');
+      }
+
+      // Web Speech API for Hindi narration
+      const utterance = new SpeechSynthesisUtterance(storyText);
+      utterance.lang = 'hi-IN';
+      utterance.rate = 0.9;
+
+      utterance.onend = () => {
+        bgAudio.pause();
+      };
+
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utterance);
+
+      // Provide audio player fallback
+      const audioPlayer = document.getElementById('audioPlayer');
+      audioPlayer.src = creepyBgUrl;
+      audioPlayer.volume = 0.2;
+      audioPlayer.loop = true;
+      audioPlayer.play().catch(() => {});
+    }
+  </script>
+
+</body>
+</html>
